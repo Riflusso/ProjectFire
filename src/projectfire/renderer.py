@@ -44,7 +44,6 @@ def _draw_grid_lines(
 
 
 def draw_grid(cam_x: float, cam_y: float, width: int, height: int, zoom: float, ground_y: float) -> None:
-    """Рисует плавную двухуровневую сетку с постепенным растворением мелких делений при отдалении."""
     min_pixel_step = 45.0
     raw_step = min_pixel_step / zoom
 
@@ -64,7 +63,6 @@ def draw_grid(cam_x: float, cam_y: float, width: int, height: int, zoom: float, 
 
 
 def draw_circle(cx: float, cy: float, radius: float, zoom: float = 1.0) -> None:
-    """Рисует гладкий круг, увеличивая число сегментов при приближении камеры."""
     screen_radius = radius * zoom
     segments = max(32, min(256, int(screen_radius * 3.0)))
 
@@ -131,6 +129,7 @@ def render_scene(
     cam_y: float,
     zoom: float,
     auto_follow: bool,
+    time_scale: float,
 ) -> None:
     GL.glClearColor(*BG_COLOR, 1.0)
     GL.glClear(GL.GL_COLOR_BUFFER_BIT)
@@ -162,7 +161,7 @@ def render_scene(
         draw_label(f"V = {velocity} м/с  |  Угол α = {angle}°{time_info}", 24.0, top_y)
 
     draw_label(
-        f"[ЛКМ] Двигать сцену  |  [F] Автослежение: {follow_status} ({zoom:.2f}x)  |  [R] Сброс",
+        f"[ЛКМ] Двигать сцену  |  [F] Автослежение: {follow_status} ({zoom:.2f}x)  |  [+/-] Скорость: {time_scale:.2f}x  |  [R] Сброс",
         24.0,
         top_y - 34.0,
         font_size=18,

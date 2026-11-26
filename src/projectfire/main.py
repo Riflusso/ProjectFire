@@ -34,6 +34,7 @@ def main() -> None:
     zoom = 1.0
     is_dragging = False
     auto_follow = True
+    time_scale = 1.0
 
     w_ptr = ctypes.c_int(width)
     h_ptr = ctypes.c_int(height)
@@ -47,9 +48,9 @@ def main() -> None:
 
         (
             running, state, input_buf, velocity, angle, launched, reset_scene,
-            cam_x, cam_y, zoom, is_dragging, auto_follow
+            cam_x, cam_y, zoom, is_dragging, auto_follow, time_scale
         ) = handle_events(
-            state, input_buf, velocity, angle, cam_x, cam_y, zoom, is_dragging, auto_follow
+            state, input_buf, velocity, angle, cam_x, cam_y, zoom, is_dragging, auto_follow, time_scale
         )
 
         if reset_scene:
@@ -72,7 +73,7 @@ def main() -> None:
 
         if state == "FLYING" and is_flying:
             proj_x, proj_y, flight_time, is_flying = step_projectile(
-                start_x, ground_y, velocity, angle, flight_time, dt, ground_y, trail
+                start_x, ground_y, velocity, angle, flight_time, dt * time_scale, ground_y, trail
             )
             if not is_flying:
                 state = "INPUT_V"
@@ -86,7 +87,7 @@ def main() -> None:
         render_scene(
             w_ptr.value, h_ptr.value, ground_y, start_x,
             has_projectile, proj_x, proj_y, flight_time, trail,
-            state, input_buf, velocity, angle, cam_x, cam_y, zoom, auto_follow
+            state, input_buf, velocity, angle, cam_x, cam_y, zoom, auto_follow, time_scale
         )
 
         sdl3.SDL_GL_SwapWindow(window)
