@@ -26,6 +26,7 @@ def main() -> None:
     is_flying = False
     proj_x = start_x
     proj_y = ground_y
+    peak_y = ground_y
     flight_time = 0.0
     trail: list[tuple[float, float]] = []
 
@@ -58,6 +59,7 @@ def main() -> None:
             is_flying = False
             proj_x = start_x
             proj_y = ground_y
+            peak_y = ground_y
             flight_time = 0.0
             trail.clear()
             velocity = 0.0
@@ -68,6 +70,7 @@ def main() -> None:
             is_flying = True
             proj_x = start_x
             proj_y = ground_y
+            peak_y = ground_y
             flight_time = 0.0
             trail = [(proj_x, proj_y)]
 
@@ -75,13 +78,14 @@ def main() -> None:
             proj_x, proj_y, flight_time, is_flying = step_projectile(
                 start_x, ground_y, velocity, angle, flight_time, dt * time_scale, ground_y, trail
             )
+            peak_y = max(peak_y, proj_y)
             if not is_flying:
                 state = "INPUT_V"
                 input_buf = ""
 
         sdl3.SDL_GetWindowSizeInPixels(window, ctypes.byref(w_ptr), ctypes.byref(h_ptr))
         cam_x, cam_y, zoom = update_camera(
-            w_ptr.value, h_ptr.value, has_projectile, proj_x, proj_y, cam_x, cam_y, zoom, auto_follow
+            w_ptr.value, h_ptr.value, has_projectile, proj_x, peak_y, cam_x, cam_y, zoom, auto_follow
         )
 
         render_scene(
