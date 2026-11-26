@@ -13,7 +13,6 @@ def step_projectile(
     ground_y: float,
     trail: list[tuple[float, float]],
 ) -> tuple[float, float, float, bool]:
-    """Вычисляет новые (x, y, flight_time, is_flying) и обновляет список точек trail."""
     flight_time += dt
     angle_rad = math.radians(angle_deg)
 
@@ -24,7 +23,6 @@ def step_projectile(
     y = start_y + vy * flight_time - 0.5 * GRAVITY * (flight_time ** 2)
     is_flying = True
 
-    # Фиксируем точное касание земли
     if y <= ground_y and flight_time > 0.05:
         discriminant = max(0.0, vy ** 2 + 2.0 * GRAVITY * (start_y - ground_y))
         exact_time = (vy + math.sqrt(discriminant)) / GRAVITY

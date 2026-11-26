@@ -19,6 +19,7 @@ def hex_to_rgba_int(hex_color: str, alpha: int = 255) -> tuple[int, int, int, in
 
 CATPPUCCIN_MOCHA = {
     "base": "#1e1e2e",
+    "surface0": "#313244",
     "green": "#a6e3a1",
     "blue": "#89b4fa",
     "mauve": "#cba6f7",
@@ -27,6 +28,7 @@ CATPPUCCIN_MOCHA = {
 }
 
 BG_COLOR = hex_to_rgb_float(CATPPUCCIN_MOCHA["base"])
+GRID_COLOR = hex_to_rgb_float(CATPPUCCIN_MOCHA["surface0"])
 GROUND_COLOR = hex_to_rgb_float(CATPPUCCIN_MOCHA["green"])
 CANNON_COLOR = hex_to_rgb_float(CATPPUCCIN_MOCHA["blue"])
 TRAIL_COLOR = hex_to_rgb_float(CATPPUCCIN_MOCHA["mauve"])

@@ -46,11 +46,21 @@ def main() -> None:
         last_time = now
 
         (
-            running, state, input_buf, velocity, angle, launched,
+            running, state, input_buf, velocity, angle, launched, reset_scene,
             cam_x, cam_y, zoom, is_dragging, auto_follow
         ) = handle_events(
             state, input_buf, velocity, angle, cam_x, cam_y, zoom, is_dragging, auto_follow
         )
+
+        if reset_scene:
+            has_projectile = False
+            is_flying = False
+            proj_x = start_x
+            proj_y = ground_y
+            flight_time = 0.0
+            trail.clear()
+            velocity = 0.0
+            angle = 45.0
 
         if launched:
             has_projectile = True

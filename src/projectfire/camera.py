@@ -2,7 +2,6 @@ from OpenGL import GL
 
 
 def setup_world_ortho(width: int, height: int, cam_x: float, cam_y: float, zoom: float) -> None:
-    """Настраивает мировую камеру с учётом смещения и масштаба."""
     GL.glViewport(0, 0, width, height)
     GL.glMatrixMode(GL.GL_PROJECTION)
     GL.glLoadIdentity()
@@ -12,7 +11,6 @@ def setup_world_ortho(width: int, height: int, cam_x: float, cam_y: float, zoom:
 
 
 def setup_screen_ortho(width: int, height: int) -> None:
-    """Настраивает экранную проекцию для статичного интерфейса."""
     GL.glMatrixMode(GL.GL_PROJECTION)
     GL.glLoadIdentity()
     GL.glOrtho(0, width, 0, height, -1, 1)
@@ -31,7 +29,6 @@ def update_camera(
     zoom: float,
     auto_follow: bool,
 ) -> tuple[float, float, float]:
-    """Закрепляет камеру на пушке (0, 0) и подбирает масштаб под ядро при автослежении."""
     if not auto_follow:
         return cam_x, max(0.0, cam_y), zoom
 

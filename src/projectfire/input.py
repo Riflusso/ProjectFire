@@ -31,14 +31,15 @@ def handle_events(
     zoom: float,
     is_dragging: bool,
     auto_follow: bool,
-) -> tuple[bool, str, str, float, float, bool, float, float, float, bool, bool]:
-    """Обрабатывает ввод с клавиатуры и мыши. Возвращает флаг launched=True при запуске нового снаряда."""
+) -> tuple[bool, str, str, float, float, bool, bool, float, float, float, bool, bool]:
+    """Обрабатывает ввод. Возвращает флаги launched (новый выстрел) и reset_scene (полный сброс)."""
     event = sdl3.SDL_Event()
     launched = False
+    reset_scene = False
 
     while sdl3.SDL_PollEvent(ctypes.byref(event)):
         if event.type == sdl3.SDL_EVENT_QUIT:
-            return False, state, input_buf, velocity, angle, False, cam_x, cam_y, zoom, is_dragging, auto_follow
+            return False, state, input_buf, velocity, angle, False, False, cam_x, cam_y, zoom, is_dragging, auto_follow
 
         elif event.type == sdl3.SDL_EVENT_MOUSE_BUTTON_DOWN:
             if event.button.button == sdl3.SDL_BUTTON_LEFT:
@@ -62,9 +63,19 @@ def handle_events(
             scancode = event.key.scancode
 
             if scancode == sdl3.SDL_SCANCODE_ESCAPE:
-                return False, state, input_buf, velocity, angle, False, cam_x, cam_y, zoom, is_dragging, auto_follow
+                return False, state, input_buf, velocity, angle, False, False, cam_x, cam_y, zoom, is_dragging, auto_follow
 
-            if scancode == sdl3.SDL_SCANCODE_F:
+            # Клавиша R — полный сброс сцены и возврат в начальное состояние
+            if scancode == sdl3.SDL_SCANCODE_R:
+                reset_scene = True
+                state = "INPUT_V"
+                input_buf = ""
+                cam_x = 0.0
+                cam_y = 0.0
+                zoom = 1.0
+                auto_follow = True
+
+            elif scancode == sdl3.SDL_SCANCODE_F:
                 auto_follow = not auto_follow
 
             elif state in ("INPUT_V", "INPUT_ANGLE"):
@@ -94,4 +105,4 @@ def handle_events(
                         state = "FLYING"
                         launched = True
 
-    return True, state, input_buf, velocity, angle, launched, cam_x, cam_y, zoom, is_dragging, auto_follow
+    return True, state, input_buf, velocity, angle, launched, reset_scene, cam_x, cam_y, zoom, is_dragging, auto_follow

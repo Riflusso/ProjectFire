@@ -3,8 +3,64 @@ import math
 from OpenGL import GL
 
 from .camera import setup_screen_ortho, setup_world_ortho
-from .styles import BALL_COLOR, BG_COLOR, CANNON_COLOR, GROUND_COLOR, TRAIL_COLOR
+from .styles import (
+    BALL_COLOR,
+    BG_COLOR,
+    CANNON_COLOR,
+    GRID_COLOR,
+    GROUND_COLOR,
+    TRAIL_COLOR,
+)
 from .ui import draw_label
+
+
+def _draw_grid_lines(
+    cam_x: float, cam_y: float, view_w: float, view_h: float, ground_y: float, step: float, alpha: float
+) -> None:
+    if alpha <= 0.01:
+        return
+
+    start_x = math.floor(cam_x / step) * step
+    end_x = cam_x + view_w + step
+    start_y = max(ground_y, math.floor(cam_y / step) * step)
+    end_y = cam_y + view_h + step
+
+    GL.glColor4f(*GRID_COLOR, alpha)
+    GL.glBegin(GL.GL_LINES)
+
+    x = start_x
+    while x <= end_x:
+        GL.glVertex2f(x, ground_y)
+        GL.glVertex2f(x, end_y)
+        x += step
+
+    y = start_y
+    while y <= end_y:
+        GL.glVertex2f(cam_x, y)
+        GL.glVertex2f(end_x, y)
+        y += step
+
+    GL.glEnd()
+
+
+def draw_grid(cam_x: float, cam_y: float, width: int, height: int, zoom: float, ground_y: float) -> None:
+    """Рисует плавную двухуровневую сетку с постепенным растворением мелких делений при отдалении."""
+    min_pixel_step = 45.0
+    raw_step = min_pixel_step / zoom
+
+    level = math.log(raw_step, 5.0)
+    base_level = math.floor(level)
+    fraction = level - base_level
+
+    minor_step = 5.0 ** base_level
+    major_step = minor_step * 5.0
+
+    view_w = width / zoom
+    view_h = height / zoom
+
+    GL.glLineWidth(1.0)
+    _draw_grid_lines(cam_x, cam_y, view_w, view_h, ground_y, minor_step, alpha=0.65 * (1.0 - fraction))
+    _draw_grid_lines(cam_x, cam_y, view_w, view_h, ground_y, major_step, alpha=0.65 + 0.35 * fraction)
 
 
 def draw_circle(cx: float, cy: float, radius: float, zoom: float = 1.0) -> None:
@@ -80,6 +136,7 @@ def render_scene(
     GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
     setup_world_ortho(width, height, cam_x, cam_y, zoom)
+    draw_grid(cam_x, cam_y, width, height, zoom, ground_y)
     draw_ground(cam_x, width, zoom, ground_y)
 
     if has_projectile:
@@ -104,4 +161,9 @@ def render_scene(
     else:
         draw_label(f"V = {velocity} м/с  |  Угол α = {angle}°{time_info}", 24.0, top_y)
 
-    draw_label(f"[ЛКМ] Двигать сцену  |  [F] Автослежение: {follow_status} (масштаб {zoom:.2f}x)", 24.0, top_y - 34.0, font_size=18)
+    draw_label(
+        f"[ЛКМ] Двигать сцену  |  [F] Автослежение: {follow_status} ({zoom:.2f}x)  |  [R] Сброс",
+        24.0,
+        top_y - 34.0,
+        font_size=18,
+    )
