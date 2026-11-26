@@ -7,7 +7,11 @@ from .styles import BALL_COLOR, BG_COLOR, CANNON_COLOR, GROUND_COLOR, TRAIL_COLO
 from .ui import draw_label
 
 
-def draw_circle(cx: float, cy: float, radius: float, segments: int = 24) -> None:
+def draw_circle(cx: float, cy: float, radius: float, zoom: float = 1.0) -> None:
+    """Рисует гладкий круг, увеличивая число сегментов при приближении камеры."""
+    screen_radius = radius * zoom
+    segments = max(32, min(256, int(screen_radius * 3.0)))
+
     GL.glBegin(GL.GL_TRIANGLE_FAN)
     GL.glVertex2f(cx, cy)
     for i in range(segments + 1):
@@ -38,14 +42,14 @@ def draw_cannon(x: float, y: float, angle_deg: float, zoom: float) -> None:
     GL.glVertex2f(end_x, end_y)
     GL.glEnd()
 
-    draw_circle(x, y, 10.0 * inv_zoom)
+    draw_circle(x, y, 10.0 * inv_zoom, zoom)
 
 
 def draw_trail(trail: list[tuple[float, float]]) -> None:
     if len(trail) < 2:
         return
 
-    GL.glColor4f(*TRAIL_COLOR, 0.75)
+    GL.glColor4f(*TRAIL_COLOR, 0.8)
     GL.glLineWidth(2.0)
     GL.glBegin(GL.GL_LINE_STRIP)
     for px, py in trail:
@@ -85,12 +89,12 @@ def render_scene(
 
     if has_projectile:
         GL.glColor3f(*BALL_COLOR)
-        draw_circle(proj_x, proj_y, max(7.0, 6.0 / zoom))
+        ball_radius = max(7.0, 6.0 / zoom)
+        draw_circle(proj_x, proj_y, ball_radius, zoom)
 
-        setup_screen_ortho(width, height)
+    setup_screen_ortho(width, height)
     top_y = float(height) - 20.0
     follow_status = "ВКЛ" if auto_follow else "ВЫКЛ"
-
     time_info = f"  |  Время: {flight_time:.2f} с" if has_projectile else ""
 
     if state == "INPUT_V":
@@ -101,4 +105,3 @@ def render_scene(
         draw_label(f"V = {velocity} м/с  |  Угол α = {angle}°{time_info}", 24.0, top_y)
 
     draw_label(f"[ЛКМ] Двигать сцену  |  [F] Автослежение: {follow_status} (масштаб {zoom:.2f}x)", 24.0, top_y - 34.0, font_size=18)
-
