@@ -1,7 +1,8 @@
 from OpenGL import GL
 from PIL import Image, ImageDraw, ImageFont
 
-# Кэш текстур: текст -> (tex_id, width, height)
+from .styles import TEXT_COLOR_RGBA
+
 _text_cache: dict[str, tuple[int, int, int]] = {}
 
 
@@ -10,12 +11,10 @@ def draw_label(
     x: float,
     y: float,
     font_size: int = 24,
-    color: tuple[int, int, int, int] = (205, 214, 244, 255),
+    color: tuple[int, int, int, int] = TEXT_COLOR_RGBA,
 ) -> None:
-    """Рисует текст через Pillow в координатах (x, y), где y — верхняя граница."""
     cache_key = f"{font_size}:{text}"
     if cache_key not in _text_cache:
-        # Ограничиваем размер кэша, чтобы не копить старые введённые числа в видеопамяти
         if len(_text_cache) > 16:
             cleanup_ui()
 
@@ -57,7 +56,6 @@ def draw_label(
 
 
 def cleanup_ui() -> None:
-    """Освобождает все закэшированные текстуры текста."""
     if _text_cache:
         GL.glDeleteTextures([tex_id for tex_id, _, _ in _text_cache.values()])
         _text_cache.clear()
