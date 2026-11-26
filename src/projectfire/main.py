@@ -47,8 +47,18 @@ def init_window(title: bytes, width: int, height: int):
     return window, gl_context
 
 
-def setup_ortho(width: int, height: int) -> None:
+def setup_world_ortho(width: int, height: int, cam_x: float, cam_y: float, zoom: float) -> None:
+    """Настраивает камеру мира с учетом смещения (cam_x, cam_y) и масштаба zoom."""
     GL.glViewport(0, 0, width, height)
+    GL.glMatrixMode(GL.GL_PROJECTION)
+    GL.glLoadIdentity()
+    GL.glOrtho(cam_x, cam_x + width / zoom, cam_y, cam_y + height / zoom, -1, 1)
+    GL.glMatrixMode(GL.GL_MODELVIEW)
+    GL.glLoadIdentity()
+
+
+def setup_screen_ortho(width: int, height: int) -> None:
+    """Экранная проекция для неподвижного UI поверх сцены."""
     GL.glMatrixMode(GL.GL_PROJECTION)
     GL.glLoadIdentity()
     GL.glOrtho(0, width, 0, height, -1, 1)
@@ -57,7 +67,6 @@ def setup_ortho(width: int, height: int) -> None:
 
 
 def scancode_to_char(scancode: int) -> str | None:
-    """Преобразует физический скан-код цифр и точки в символ независимо от раскладки."""
     digits = {
         sdl3.SDL_SCANCODE_0: "0", sdl3.SDL_SCANCODE_KP_0: "0",
         sdl3.SDL_SCANCODE_1: "1", sdl3.SDL_SCANCODE_KP_1: "1",
@@ -76,22 +85,59 @@ def scancode_to_char(scancode: int) -> str | None:
 
 
 def handle_events(
-    state: str, input_buf: str, velocity: float, angle: float, start_x: float, ground_y: float
-) -> tuple[bool, str, str, float, float, Projectile | None]:
+    state: str,
+    input_buf: str,
+    velocity: float,
+    angle: float,
+    start_x: float,
+    ground_y: float,
+    cam_x: float,
+    cam_y: float,
+    zoom: float,
+    is_dragging: bool,
+    auto_follow: bool,
+) -> tuple[bool, str, str, float, float, Projectile | None, float, float, float, bool, bool]:
     event = sdl3.SDL_Event()
     new_projectile = None
 
     while sdl3.SDL_PollEvent(ctypes.byref(event)):
         if event.type == sdl3.SDL_EVENT_QUIT:
-            return False, state, input_buf, velocity, angle, None
+            return False, state, input_buf, velocity, angle, None, cam_x, cam_y, zoom, is_dragging, auto_follow
 
-        if event.type == sdl3.SDL_EVENT_KEY_DOWN:
+        # Зажатие и отпускание ЛКМ для перетаскивания сцены
+        elif event.type == sdl3.SDL_EVENT_MOUSE_BUTTON_DOWN:
+            if event.button.button == sdl3.SDL_BUTTON_LEFT:
+                is_dragging = True
+                auto_follow = False  # При ручном сдвиге отключаем автослежение
+
+        elif event.type == sdl3.SDL_EVENT_MOUSE_BUTTON_UP:
+            if event.button.button == sdl3.SDL_BUTTON_LEFT:
+                is_dragging = False
+
+        # Перемещение сцены мышкой (как на карте)
+        elif event.type == sdl3.SDL_EVENT_MOUSE_MOTION and is_dragging:
+            cam_x -= event.motion.xrel / zoom
+            cam_y += event.motion.yrel / zoom
+            # Запрещаем опускать камеру ниже пола
+            cam_y = max(0.0, cam_y)
+
+        # Масштабирование колёсиком мыши
+        elif event.type == sdl3.SDL_EVENT_MOUSE_WHEEL:
+            zoom_factor = 1.15 if event.wheel.y > 0 else (1.0 / 1.15)
+            zoom = max(0.1, min(5.0, zoom * zoom_factor))
+            auto_follow = False
+
+        elif event.type == sdl3.SDL_EVENT_KEY_DOWN:
             scancode = event.key.scancode
 
             if scancode == sdl3.SDL_SCANCODE_ESCAPE:
-                return False, state, input_buf, velocity, angle, None
+                return False, state, input_buf, velocity, angle, None, cam_x, cam_y, zoom, is_dragging, auto_follow
 
-            if state in ("INPUT_V", "INPUT_ANGLE"):
+            # Клавиша F (русская 'А') — переключение автослежения и автомасштабирования
+            if scancode == sdl3.SDL_SCANCODE_F:
+                auto_follow = not auto_follow
+
+            elif state in ("INPUT_V", "INPUT_ANGLE"):
                 ch = scancode_to_char(scancode)
                 if ch is not None:
                     if ch == "." and "." in input_buf:
@@ -118,7 +164,36 @@ def handle_events(
                         state = "FLYING"
                         new_projectile = Projectile(start_x, ground_y, velocity, angle)
 
-    return True, state, input_buf, velocity, angle, new_projectile
+    return True, state, input_buf, velocity, angle, new_projectile, cam_x, cam_y, zoom, is_dragging, auto_follow
+
+
+def update_camera(
+    width: int,
+    height: int,
+    projectile: Projectile | None,
+    cam_x: float,
+    cam_y: float,
+    zoom: float,
+    auto_follow: bool,
+) -> tuple[float, float, float]:
+    """Жёстко закрепляет камеру на пушке (0, 0) и масштабирует сцену под ядро."""
+    if not auto_follow:
+        return cam_x, max(0.0, cam_y), zoom
+
+    # Жёстко привязываем левый нижний угол камеры к началу координат (пушка всегда на месте)
+    cam_x = 0.0
+    cam_y = 0.0
+
+    if projectile is None:
+        return cam_x, cam_y, 1.0
+
+    # Габариты от левого нижнего угла (0, 0) до текущего положения ядра с запасом под края и UI
+    max_x = max(float(width), projectile.x + 80.0)
+    max_y = max(float(height), projectile.y + 120.0)
+
+    zoom = min(1.0, width / max_x, height / max_y)
+    return cam_x, cam_y, zoom
+
 
 
 def draw_circle(cx: float, cy: float, radius: float, segments: int = 24) -> None:
@@ -130,12 +205,13 @@ def draw_circle(cx: float, cy: float, radius: float, segments: int = 24) -> None
     GL.glEnd()
 
 
-def draw_ground(width: int, ground_y: float) -> None:
+def draw_ground(cam_x: float, width: int, zoom: float, ground_y: float) -> None:
+    """Рисует бесконечную линию горизонта в пределах видимой области камеры."""
     GL.glColor3f(*GROUND_COLOR)
     GL.glLineWidth(3.0)
     GL.glBegin(GL.GL_LINES)
-    GL.glVertex2f(0.0, ground_y)
-    GL.glVertex2f(float(width), ground_y)
+    GL.glVertex2f(cam_x - 200.0, ground_y)
+    GL.glVertex2f(cam_x + width / zoom + 200.0, ground_y)
     GL.glEnd()
 
 
@@ -176,13 +252,17 @@ def render(
     input_buf: str,
     velocity: float,
     angle: float,
+    cam_x: float,
+    cam_y: float,
+    zoom: float,
+    auto_follow: bool,
 ) -> None:
-    setup_ortho(width, height)
-
     GL.glClearColor(*BG_COLOR, 1.0)
     GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
-    draw_ground(width, ground_y)
+    # 1. Отрисовка игрового мира с учетом камеры
+    setup_world_ortho(width, height, cam_x, cam_y, zoom)
+    draw_ground(cam_x, width, zoom, ground_y)
 
     if projectile is not None:
         draw_trail(projectile.trail)
@@ -192,15 +272,27 @@ def render(
 
     if projectile is not None:
         GL.glColor3f(*BALL_COLOR)
-        draw_circle(projectile.x, projectile.y, 7.0)
+        # Сохраняем визуальный размер ядра при сильном отдалении
+        draw_circle(projectile.x, projectile.y, max(7.0, 6.0 / zoom))
 
-    top_y = float(height) - 24.0
+    # 2. Отрисовка неподвижного интерфейса поверх сцены
+    setup_screen_ortho(width, height)
+    top_y = float(height) - 20.0
+    follow_status = "ВКЛ" if auto_follow else "ВЫКЛ"
+
     if state == "INPUT_V":
-        draw_label(f"Введите скорость V (м/с): {input_buf}_", 24.0, top_y)
+        draw_label(f"Введите скорость V (м/с): {input_buf}", 24.0, top_y)
     elif state == "INPUT_ANGLE":
-        draw_label(f"V = {velocity} м/с | Введите угол α (0–90°): {input_buf}_", 24.0, top_y)
+        draw_label(f"V = {velocity} м/с | Введите угол α (0–90°): {input_buf}", 24.0, top_y)
     else:
-        draw_label(f"V = {velocity} м/с  |  Угол α = {angle}°  |  Время: {projectile.time:.2f} с", 24.0, top_y)
+        draw_label(f"V = {velocity} м/с | Угол α = {angle}° | Время: {projectile.time:.2f} с", 24.0, top_y)
+
+    draw_label(
+        f"[ЛКМ] Двигать сцену | [F] Автослежение: {follow_status} (масштаб {zoom:.2f}x)",
+        24.0,
+        top_y - 34.0,
+        font_size=18,
+    )
 
 
 def cleanup(window, gl_context) -> None:
@@ -223,19 +315,31 @@ def main() -> None:
     angle = 45.0
     projectile: Projectile | None = None
 
+    cam_x = 0.0
+    cam_y = 0.0
+    zoom = 1.0
+    is_dragging = False
+    auto_follow = True
+
     w_ptr = ctypes.c_int(width)
     h_ptr = ctypes.c_int(height)
-    last_time = time.perf_counter()
 
+    last_time = time.perf_counter()
     running = True
+
     while running:
         now = time.perf_counter()
         dt = min(now - last_time, 0.05)
         last_time = now
 
-        running, state, input_buf, velocity, angle, new_proj = handle_events(
-            state, input_buf, velocity, angle, start_x, ground_y
+        (
+            running, state, input_buf, velocity, angle, new_proj,
+            cam_x, cam_y, zoom, is_dragging, auto_follow
+        ) = handle_events(
+            state, input_buf, velocity, angle, start_x, ground_y,
+            cam_x, cam_y, zoom, is_dragging, auto_follow
         )
+
         if new_proj is not None:
             projectile = new_proj
 
@@ -246,8 +350,15 @@ def main() -> None:
                 input_buf = ""
 
         sdl3.SDL_GetWindowSizeInPixels(window, ctypes.byref(w_ptr), ctypes.byref(h_ptr))
-        render(w_ptr.value, h_ptr.value, ground_y, start_x, projectile, state, input_buf, velocity, angle)
 
+        cam_x, cam_y, zoom = update_camera(
+            w_ptr.value, h_ptr.value, projectile, cam_x, cam_y, zoom, auto_follow
+        )
+
+        render(
+            w_ptr.value, h_ptr.value, ground_y, start_x, projectile,
+            state, input_buf, velocity, angle, cam_x, cam_y, zoom, auto_follow
+        )
         sdl3.SDL_GL_SwapWindow(window)
 
     cleanup(window, gl_context)

@@ -1,8 +1,8 @@
 from OpenGL import GL
 from PIL import Image, ImageDraw, ImageFont
 
-# Кэш последней отрисованной текстуры: (текст, tex_id, width, height)
-_text_cache: tuple[str, int, int, int] | None = None
+# Кэш текстур: текст -> (tex_id, width, height)
+_text_cache: dict[str, tuple[int, int, int]] = {}
 
 
 def draw_label(
@@ -12,12 +12,12 @@ def draw_label(
     font_size: int = 24,
     color: tuple[int, int, int, int] = (205, 214, 244, 255),
 ) -> None:
-    """Рисует текст через Pillow в левом верхнем углу (x, y), где y — верхняя граница."""
-    global _text_cache
-
-    if _text_cache is None or _text_cache[0] != text:
-        if _text_cache is not None:
-            GL.glDeleteTextures([_text_cache[1]])
+    """Рисует текст через Pillow в координатах (x, y), где y — верхняя граница."""
+    cache_key = f"{font_size}:{text}"
+    if cache_key not in _text_cache:
+        # Ограничиваем размер кэша, чтобы не копить старые введённые числа в видеопамяти
+        if len(_text_cache) > 16:
+            cleanup_ui()
 
         try:
             font = ImageFont.truetype("arial.ttf", font_size)
@@ -38,15 +38,14 @@ def draw_label(
         GL.glTexImage2D(
             GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, w, h, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, img.tobytes()
         )
-        _text_cache = (text, tex_id, w, h)
+        _text_cache[cache_key] = (tex_id, w, h)
 
-    _, tex_id, w, h = _text_cache
+    tex_id, w, h = _text_cache[cache_key]
 
     GL.glEnable(GL.GL_TEXTURE_2D)
     GL.glBindTexture(GL.GL_TEXTURE_2D, tex_id)
     GL.glColor3f(1.0, 1.0, 1.0)
 
-    # Учитываем, что в нашей проекции ось Y направлена вверх
     GL.glBegin(GL.GL_QUADS)
     GL.glTexCoord2f(0.0, 0.0); GL.glVertex2f(x, y)
     GL.glTexCoord2f(1.0, 0.0); GL.glVertex2f(x + w, y)
@@ -58,8 +57,7 @@ def draw_label(
 
 
 def cleanup_ui() -> None:
-    """Освобождает текстуру текста при закрытии приложения."""
-    global _text_cache
-    if _text_cache is not None:
-        GL.glDeleteTextures([_text_cache[1]])
-        _text_cache = None
+    """Освобождает все закэшированные текстуры текста."""
+    if _text_cache:
+        GL.glDeleteTextures([tex_id for tex_id, _, _ in _text_cache.values()])
+        _text_cache.clear()
